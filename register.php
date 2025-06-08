@@ -6,32 +6,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Klinik Penawar Appointment System - Register</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
+        :root {
+            --primary-color: #2c786c;
+            --accent-color: #004445;
+        }
         body {
-            background-color: #f8f9fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f8ff;
+            font-family: 'Poppins', sans-serif;
+            background-image: url('https://img.freepik.com/free-vector/hand-painted-watercolor-pastel-sky-background_23-2148902771.jpg');
+            background-size: cover;
+            background-attachment: fixed;
         }
         .register-container {
-            max-width: 500px;
-            margin: 60px auto;
-            padding: 30px;
+            max-width: 600px;
+            margin: 50px auto;
             background: white;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
         }
         .register-header {
-            color: #2c786c;
+            color: var(--primary-color);
             text-align: center;
-            margin-bottom: 25px;
+            margin-bottom: 30px;
         }
         .btn-primary {
-            background-color: #2c786c;
-            border-color: #2c786c;
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
         }
         .btn-primary:hover {
-            background-color: #004445;
-            border-color: #004445;
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
         }
     </style>
 </head>
@@ -77,13 +84,11 @@
                 try {
                     $pdo->beginTransaction();
                     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                    $stmt = $pdo->prepare("INSERT INTO users (username, password, role, email, first_name, last_name) 
-                                           VALUES (?, ?, 'patient', ?, ?, ?)");
+                    $stmt = $pdo->prepare("INSERT INTO users (username, password, role, email, first_name, last_name) VALUES (?, ?, 'patient', ?, ?, ?)");
                     $stmt->execute([$username, $hashed_password, $email, $first_name, $last_name]);
                     $user_id = $pdo->lastInsertId();
 
-                    $stmt = $pdo->prepare("INSERT INTO patients (user_id, dob, gender, phone, address, blood_group) 
-                                           VALUES (?, ?, ?, ?, ?, ?)");
+                    $stmt = $pdo->prepare("INSERT INTO patients (user_id, dob, gender, phone, address, blood_group) VALUES (?, ?, ?, ?, ?, ?)");
                     $stmt->execute([$user_id, $dob, $gender, $phone, $address, $blood_group]);
 
                     $pdo->commit();
@@ -173,7 +178,7 @@
                     <option value="AB-">AB-</option>
                     <option value="O+">O+</option>
                     <option value="O-">O-</option>
-                    <option value="NOT SURE">O-</option>
+                    <option value="NOT SURE">NOT SURE</option>
                 </select>
             </div>
 
