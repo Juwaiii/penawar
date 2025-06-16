@@ -153,7 +153,6 @@ $pending_appointments = $stmt->fetchAll();
         <div class="card-body d-grid gap-2">
             <a href="appointments.php?filter=pending" class="btn btn-warning text-dark"><i class="fas fa-clock me-2"></i>Pending Appointments</a>
             <a href="medical_records.php" class="btn btn-success"><i class="fas fa-file-medical-alt me-2"></i>Medical Records</a>
-            <a href="prescriptions.php" class="btn btn-info text-white"><i class="fas fa-prescription me-2"></i>Prescriptions</a>
         </div>
     </div>
 

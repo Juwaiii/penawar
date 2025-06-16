@@ -256,9 +256,7 @@ if (isset($_GET['export_pdf'])) {
                         <a href="medical_records.php" class="btn action-btn btn-secondary">
                             <i class="fas fa-file-medical"></i> View Medical Records
                         </a>
-                        <a href="prescriptions.php" class="btn action-btn btn-info text-white">
-                            <i class="fas fa-prescription-bottle-alt"></i> View Prescriptions
-                        </a>
+
                         <a href="bill.php" class="btn action-btn btn-warning">
                             <i class="fas fa-file-invoice-dollar"></i> View Bills & Payments
                         </a>
