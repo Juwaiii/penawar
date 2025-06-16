@@ -177,7 +177,7 @@ $patients = $patients_stmt->fetchAll();
                         <textarea name="diagnosis" class="form-control" required></textarea>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Treatment</label>
+                        <label class="form-label">Medication</label>
                         <textarea name="treatment" class="form-control" required></textarea>
                     </div>
                     <div class="mb-3">

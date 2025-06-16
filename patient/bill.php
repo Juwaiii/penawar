@@ -1,13 +1,56 @@
 <?php
 session_start();
 require_once '../db.php';
+require '../vendor/autoload.php'; // ✅ Dompdf
+use Dompdf\Dompdf;
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'patient') {
     header('Location: ../index.php');
     exit();
 }
 
-// Handle file upload
+// ✅ Handle PDF export
+if (isset($_GET['print_pdf'])) {
+    $billId = intval($_GET['print_pdf']);
+    $stmt = $pdo->prepare("SELECT b.id, b.description, b.total, b.status, 
+                                  DATE_FORMAT(b.created_at, '%M %d, %Y %h:%i %p') AS created_at, 
+                                  CONCAT(u.first_name, ' ', u.last_name) AS patient_name,
+                                  CONCAT(d_u.first_name, ' ', d_u.last_name) AS doctor_name
+                           FROM bills b
+                           JOIN patients p ON b.patient_id = p.id
+                           JOIN users u ON p.user_id = u.id
+                           JOIN doctors d ON b.doctor_id = d.id
+                           JOIN users d_u ON d.user_id = d_u.id
+                           WHERE b.id = ? AND p.user_id = ?");
+    $stmt->execute([$billId, $_SESSION['user_id']]);
+    $bill = $stmt->fetch();
+
+    if ($bill) {
+        $dompdf = new Dompdf();
+        ob_start();
+        ?>
+        <h2 style="text-align:center;">Klinik Penawar Bill Receipt</h2>
+        <hr>
+        <p><strong>Patient:</strong> <?= htmlspecialchars($bill['patient_name']) ?></p>
+        <p><strong>Doctor:</strong> <?= htmlspecialchars($bill['doctor_name']) ?></p>
+        <p><strong>Date:</strong> <?= $bill['created_at'] ?></p>
+        <p><strong>Status:</strong> <?= $bill['status'] ?></p>
+        <hr>
+        <p><strong>Description:</strong></p>
+        <p><?= nl2br(htmlspecialchars($bill['description'])) ?></p>
+        <hr>
+        <h4>Total: RM <?= number_format($bill['total'], 2) ?></h4>
+        <?php
+        $html = ob_get_clean();
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+        $dompdf->stream("Bill_Receipt_{$billId}.pdf", ["Attachment" => false]);
+        exit();
+    }
+}
+
+// ✅ Handle file upload
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bill_id']) && isset($_FILES['payment_pdf'])) {
     $bill_id = $_POST['bill_id'];
     $file = $_FILES['payment_pdf'];
@@ -35,8 +78,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bill_id']) && isset($
     }
 }
 
-// Get bills for this patient
-$stmt = $pdo->prepare("SELECT b.id, b.description, b.total, b.status, DATE_FORMAT(b.created_at, '%M %d, %Y %h:%i %p') AS formatted_date, CONCAT(u.first_name, ' ', u.last_name) AS doctor_name FROM bills b JOIN doctors d ON b.doctor_id = d.id JOIN users u ON d.user_id = u.id WHERE b.patient_id = (SELECT id FROM patients WHERE user_id = ?) ORDER BY b.created_at DESC");
+// ✅ Get bills
+$stmt = $pdo->prepare("SELECT b.id, b.description, b.total, b.status, 
+                              DATE_FORMAT(b.created_at, '%M %d, %Y %h:%i %p') AS formatted_date, 
+                              CONCAT(u.first_name, ' ', u.last_name) AS doctor_name 
+                       FROM bills b 
+                       JOIN doctors d ON b.doctor_id = d.id 
+                       JOIN users u ON d.user_id = u.id 
+                       WHERE b.patient_id = (SELECT id FROM patients WHERE user_id = ?) 
+                       ORDER BY b.created_at DESC");
 $stmt->execute([$_SESSION['user_id']]);
 $bills = $stmt->fetchAll();
 ?>
@@ -106,7 +156,9 @@ $bills = $stmt->fetchAll();
                                             <button type="submit" class="btn btn-sm btn-primary">Upload Receipt</button>
                                         </form>
                                     <?php else: ?>
-                                        <em>N/A</em>
+                                        <a href="?print_pdf=<?= $bill['id'] ?>" class="btn btn-sm btn-outline-danger">
+                                            <i class="fas fa-file-pdf"></i> Print PDF
+                                        </a>
                                     <?php endif; ?>
                                 </td>
                             </tr>

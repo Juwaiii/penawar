@@ -6,13 +6,11 @@ error_reporting(E_ALL);
 session_start();
 include '../db.php';
 
-// Restrict to admin only
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     header('Location: ../index.php');
     exit();
 }
 
-// Count stats
 $patients_count = $pdo->query("SELECT COUNT(*) FROM patients")->fetchColumn();
 $doctors_count = $pdo->query("SELECT COUNT(*) FROM doctors")->fetchColumn();
 $appointments_count = $pdo->query("SELECT COUNT(*) FROM appointments")->fetchColumn();
@@ -56,6 +54,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_doctor'])) {
         } catch (PDOException $e) {
             $pdo->rollBack();
             $doctorErrors[] = "Database error: " . $e->getMessage();
+        }
+    }
+}
+
+// Patient registration logic
+$patientErrors = [];
+$patientSuccess = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_patient'])) {
+    $pUsername = trim($_POST['p_username']);
+    $pPassword = $_POST['p_password'];
+    $pEmail = trim($_POST['p_email']);
+    $pFirst = trim($_POST['p_first_name']);
+    $pLast = trim($_POST['p_last_name']);
+    $pDOB = $_POST['p_dob'];
+    $pGender = $_POST['p_gender'];
+    $pPhone = trim($_POST['p_phone']);
+    $pAddress = trim($_POST['p_address']);
+
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+    $stmt->execute([$pUsername]);
+    if ($stmt->fetch()) $patientErrors[] = "Username already exists.";
+
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+    $stmt->execute([$pEmail]);
+    if ($stmt->fetch()) $patientErrors[] = "Email already exists.";
+
+    if (empty($patientErrors)) {
+        try {
+            $pdo->beginTransaction();
+            $hashed = password_hash($pPassword, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("INSERT INTO users (username, password, role, email, first_name, last_name) VALUES (?, ?, 'patient', ?, ?, ?)");
+            $stmt->execute([$pUsername, $hashed, $pEmail, $pFirst, $pLast]);
+            $uid = $pdo->lastInsertId();
+
+            $stmt = $pdo->prepare("INSERT INTO patients (user_id, dob, gender, phone, address) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$uid, $pDOB, $pGender, $pPhone, $pAddress]);
+
+            $pdo->commit();
+            $patientSuccess = "Patient registered successfully!";
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            $patientErrors[] = "Database error: " . $e->getMessage();
         }
     }
 }
@@ -155,27 +196,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_doctor'])) {
         <div class="card-header"><i class="fas fa-bolt me-2"></i>Quick Actions</div>
         <div class="card-body">
             <div class="d-grid gap-2">
-                <!-- ✅ Fixed appointment summary path -->
-                <a href="appointments_summary.php" class="btn btn-primary">
-                    <i class="fas fa-calendar-alt"></i> Appointments Summary
-                </a>
-                <a href="medical_records.php" class="btn btn-success">
-                    <i class="fas fa-notes-medical"></i> Medical Records
-                </a>
-               
-                <a href="bills_summary.php" class="btn btn-warning">
-                    <i class="fas fa-file-invoice-dollar"></i> Bills Summary
-                </a>
-                <a href="inventory.php" class="btn btn-info">
-                    <i class="fas fa-pills"></i> Inventory Management
-                </a>
+                <a href="appointments_summary.php" class="btn btn-primary"><i class="fas fa-calendar-alt"></i> Appointments Summary</a>
+                <a href="medical_records.php" class="btn btn-success"><i class="fas fa-notes-medical"></i> Medical Records</a>
+                <a href="bills_summary.php" class="btn btn-warning"><i class="fas fa-file-invoice-dollar"></i> Bills Summary</a>
+                <a href="inventory.php" class="btn btn-info"><i class="fas fa-pills"></i> Inventory Management</a>
             </div>
         </div>
     </div>
 
-    <div class="text-center mt-4">
+    <div class="text-center mt-4 d-flex justify-content-center gap-3">
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#doctorModal">
             <i class="fas fa-user-md me-1"></i> Register New Doctor
+        </button>
+        <button class="btn btn-info text-white" data-bs-toggle="modal" data-bs-target="#patientModal">
+            <i class="fas fa-user-plus me-1"></i> Register New Patient
         </button>
     </div>
 </div>
@@ -207,6 +241,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_doctor'])) {
       </div>
       <div class="modal-footer">
         <button type="submit" name="register_doctor" class="btn btn-success">Register Doctor</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Patient Registration Modal -->
+<div class="modal fade" id="patientModal" tabindex="-1" aria-labelledby="patientModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <form class="modal-content" method="POST">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title">Register New Patient</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <?php if (!empty($patientErrors)): ?>
+            <div class="alert alert-danger"><?php foreach ($patientErrors as $err) echo htmlspecialchars($err) . "<br>"; ?></div>
+        <?php elseif ($patientSuccess): ?>
+            <div class="alert alert-success"><?= htmlspecialchars($patientSuccess) ?></div>
+        <?php endif; ?>
+        <div class="row">
+          <div class="col-md-6 mb-3"><label>Username *</label><input type="text" name="p_username" class="form-control" required></div>
+          <div class="col-md-6 mb-3"><label>Email *</label><input type="email" name="p_email" class="form-control" required></div>
+          <div class="col-md-6 mb-3"><label>Password *</label><input type="password" name="p_password" class="form-control" required></div>
+          <div class="col-md-6 mb-3"><label>First Name *</label><input type="text" name="p_first_name" class="form-control" required></div>
+          <div class="col-md-6 mb-3"><label>Last Name *</label><input type="text" name="p_last_name" class="form-control" required></div>
+          <div class="col-md-6 mb-3"><label>Date of Birth *</label><input type="date" name="p_dob" class="form-control" required></div>
+          <div class="col-md-6 mb-3"><label>Gender *</label>
+              <select name="p_gender" class="form-control" required>
+                  <option value="">Select</option>
+                  <option>Male</option>
+                  <option>Female</option>
+                  <option>Other</option>
+              </select>
+          </div>
+          <div class="col-md-6 mb-3"><label>Phone *</label><input type="text" name="p_phone" class="form-control" required></div>
+          <div class="col-md-12 mb-3"><label>Address *</label><textarea name="p_address" class="form-control" rows="2" required></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" name="register_patient" class="btn btn-info text-white">Register Patient</button>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </form>

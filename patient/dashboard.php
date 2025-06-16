@@ -1,6 +1,9 @@
 <?php 
 session_start();
 include '../db.php';
+require '../vendor/autoload.php'; // For Dompdf
+
+use Dompdf\Dompdf;
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'patient') {
     header('Location: ../index.php');
@@ -17,7 +20,7 @@ if (isset($_GET['cancel'])) {
     $cancelId = intval($_GET['cancel']);
     $stmt = $pdo->prepare("UPDATE appointments SET status = 'Cancelled' WHERE id = ? AND patient_id = ?");
     $stmt->execute([$cancelId, $patient['id']]);
-    header("Location: dashboard.php"); // reload to reflect change
+    header("Location: dashboard.php");
     exit();
 }
 
@@ -32,7 +35,48 @@ $stmt = $pdo->prepare("SELECT a.*, u.first_name, u.last_name, d.specialization
                       ORDER BY a.appointment_date, a.appointment_time");
 $stmt->execute([$patient['id']]);
 $appointments = $stmt->fetchAll();
+
+// ✅ Filter for appointment history
+$filter = $_GET['history_filter'] ?? 'all';
+$filterQuery = "";
+
+if ($filter === 'completed') {
+    $filterQuery = "AND a.status = 'Completed'";
+} elseif ($filter === 'cancelled') {
+    $filterQuery = "AND a.status = 'Cancelled'";
+}
+
+// ✅ Show all past or completed appointments (even if date >= today)
+$query = "SELECT a.*, u.first_name, u.last_name, d.specialization 
+          FROM appointments a 
+          JOIN doctors d ON a.doctor_id = d.id 
+          JOIN users u ON d.user_id = u.id 
+          WHERE a.patient_id = ? 
+            AND a.status IN ('Completed', 'Cancelled')
+            $filterQuery
+          ORDER BY a.appointment_date DESC, a.appointment_time DESC";
+
+$stmt = $pdo->prepare($query);
+$stmt->execute([$patient['id']]);
+$pastAppointments = $stmt->fetchAll();
+
+// ✅ Handle export to PDF
+if (isset($_GET['export_pdf'])) {
+    $dompdf = new Dompdf();
+    ob_start();
+    echo "<h2>Appointment History</h2><table border='1' width='100%' cellpadding='5'><tr><th>Date</th><th>Time</th><th>Doctor</th><th>Status</th></tr>";
+    foreach ($pastAppointments as $app) {
+        echo "<tr><td>" . $app['appointment_date'] . "</td><td>" . $app['appointment_time'] . "</td><td>Dr. " . htmlspecialchars($app['first_name'] . ' ' . $app['last_name']) . "</td><td>" . $app['status'] . "</td></tr>";
+    }
+    echo "</table>";
+    $html = ob_get_clean();
+    $dompdf->loadHtml($html);
+    $dompdf->render();
+    $dompdf->stream("appointment_history.pdf", ["Attachment" => 1]);
+    exit();
+}
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -227,6 +271,65 @@ $appointments = $stmt->fetchAll();
         </div>
     </div>
 </div>
+<!-- Appointment History -->
+<div class="card shadow mt-4 appointment-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-history me-2"></i> Appointment History</span>
+        <div>
+            <form method="GET" class="d-inline">
+                <select name="history_filter" class="form-select form-select-sm d-inline w-auto" onchange="this.form.submit()">
+                    <option value="all" <?= ($filter === 'all') ? 'selected' : '' ?>>All</option>
+                    <option value="completed" <?= ($filter === 'completed') ? 'selected' : '' ?>>Completed</option>
+                    <option value="cancelled" <?= ($filter === 'cancelled') ? 'selected' : '' ?>>Cancelled</option>
+                </select>
+            </form>
+            <a href="?export_pdf=1<?= $filter !== 'all' ? '&history_filter=' . $filter : '' ?>" class="btn btn-sm btn-outline-danger ms-2">
+                <i class="fas fa-file-pdf"></i> Export PDF
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <?php if (count($pastAppointments) > 0): ?>
+            <ul class="list-group list-group-flush">
+                <?php foreach ($pastAppointments as $appointment): ?>
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="doctor-name mb-2">
+                                    <i class="fas fa-user-md me-2"></i>Dr. <?= htmlspecialchars($appointment['first_name'] . ' ' . $appointment['last_name']) ?>
+                                </h5>
+                                <span class="specialization-badge"><?= htmlspecialchars($appointment['specialization']) ?></span>
+                            </div>
+                            <div class="text-end">
+                                <span class="status-badge <?= $appointment['status'] === 'Completed' ? 'status-confirmed' : 'status-pending' ?>">
+                                    <?= $appointment['status'] ?>
+                                </span><br>
+                                <small class="text-muted">Appointment ID: <?= $appointment['id'] ?></small>
+                            </div>
+                        </div>
+                        <hr class="my-2">
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <p><i class="far fa-calendar-alt me-2"></i> <strong>Date:</strong> <?= date('F j, Y', strtotime($appointment['appointment_date'])) ?></p>
+                                <p><i class="far fa-clock me-2"></i> <strong>Time:</strong> <?= date('g:i A', strtotime($appointment['appointment_time'])) ?></p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Reason:</strong></p>
+                                <p class="text-muted"><?= htmlspecialchars($appointment['reason']) ?></p>
+                            </div>
+                        </div>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <div class="no-appointments">
+                <i class="far fa-calendar-times fa-3x mb-3" style="color: #adb5bd;"></i>
+                <p>No past appointments found.</p>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
