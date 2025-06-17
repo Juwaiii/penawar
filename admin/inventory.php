@@ -7,17 +7,19 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     exit();
 }
 
+// Add new item
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_item'])) {
     $item_name = $_POST['item_name'] ?? '';
     $quantity = isset($_POST['quantity']) ? intval($_POST['quantity']) : 0;
     $unit = $_POST['unit'] ?? '';
 
-    $stmt = $pdo->prepare("INSERT INTO inventory (item_name, quantity, unit) VALUES (?, ?, ?)");
+    $stmt = $pdo->prepare("INSERT INTO inventory (item_name, quantity, unit, last_updated) VALUES (?, ?, ?, NOW())");
     $stmt->execute([$item_name, $quantity, $unit]);
     header("Location: inventory.php");
     exit();
 }
 
+// Delete item
 if (isset($_GET['delete'])) {
     $id = intval($_GET['delete']);
     $stmt = $pdo->prepare("DELETE FROM inventory WHERE id = ?");
@@ -26,6 +28,7 @@ if (isset($_GET['delete'])) {
     exit();
 }
 
+// Get all items
 $stmt = $pdo->query("SELECT * FROM inventory ORDER BY id DESC");
 $items = $stmt->fetchAll();
 ?>
@@ -84,7 +87,12 @@ $items = $stmt->fetchAll();
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="fas fa-boxes me-2"></i>Inventory Management</span>
-            <a href="dashboard.php" class="btn btn-sm btn-outline-light">Back to Dashboard</a>
+            <div>
+                <a href="dashboard.php" class="btn btn-sm btn-outline-light">Back to Dashboard</a>
+                <a href="print_inventory.php" class="btn btn-sm btn-outline-light ms-2" target="_blank">
+                    <i class="fas fa-file-pdf"></i> Print PDF
+                </a>
+            </div>
         </div>
         <div class="card-body">
             <form method="POST" class="row g-3 mb-4">
@@ -109,6 +117,7 @@ $items = $stmt->fetchAll();
                         <th>Item Name</th>
                         <th>Quantity</th>
                         <th>Unit</th>
+                        <th>Last Updated</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -119,6 +128,7 @@ $items = $stmt->fetchAll();
                             <td><?= htmlspecialchars($item['item_name']) ?></td>
                             <td><?= $item['quantity'] ?></td>
                             <td><?= htmlspecialchars($item['unit']) ?></td>
+                            <td><?= $item['last_updated'] ?></td>
                             <td>
                                 <a href="edit_inventory.php?id=<?= $item['id'] ?>" class="btn btn-sm btn-warning">Edit</a>
                                 <a href="inventory.php?delete=<?= $item['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this item?');">Delete</a>

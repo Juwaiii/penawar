@@ -34,14 +34,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_record']) && $
 
     if ($patient_id) {
         $diagnosis = $_POST['diagnosis'];
-        $treatment = $_POST['treatment'];
         $notes = $_POST['notes'];
 
+        // Medication dropdown comes as "Panadol|3"
+        $treatment_raw = $_POST['treatment'];
+        list($treatment, $med_id) = explode('|', $treatment_raw);
+
+        // Reduce inventory quantity
+        $updateQty = $pdo->prepare("UPDATE inventory SET quantity = quantity - 1 WHERE id = ? AND quantity > 0");
+        $updateQty->execute([$med_id]);
+
+        // Insert medical record
         $stmt = $pdo->prepare("INSERT INTO medical_records (patient_id, doctor_id, appointment_id, diagnosis, treatment, notes) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$patient_id, $doctor_id, $appointment_id, $diagnosis, $treatment, $notes]);
-        $message = "Record added successfully!";
+        $message = "Record added successfully and inventory updated!";
     } else {
-        $message = "Error: Patient ID is required (either selected or resolved from appointment).";
+        $message = "Error: Patient ID is required.";
     }
 }
 
@@ -49,9 +57,12 @@ $stmt = $pdo->prepare("SELECT mr.*, CONCAT(u.first_name, ' ', u.last_name) AS pa
 $stmt->execute([$doctor_id]);
 $records_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// fetch patients for optional dropdown
+// fetch patients for dropdown
 $patients_stmt = $pdo->query("SELECT p.id, u.first_name, u.last_name FROM patients p JOIN users u ON p.user_id = u.id ORDER BY u.first_name");
 $patients = $patients_stmt->fetchAll();
+
+// fetch available medications from inventory
+$meds = $pdo->query("SELECT * FROM inventory WHERE quantity > 0 ORDER BY item_name")->fetchAll();
 ?>
 
 <!DOCTYPE html>
@@ -63,9 +74,7 @@ $patients = $patients_stmt->fetchAll();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
     <style>
-        :root {
-            --primary-color: #2c786c;
-        }
+        :root { --primary-color: #2c786c; }
         body {
             background-color: #f0f8ff;
             font-family: 'Poppins', sans-serif;
@@ -121,7 +130,7 @@ $patients = $patients_stmt->fetchAll();
                                 <th>Patient</th>
                                 <th>Date</th>
                                 <th>Diagnosis</th>
-                                <th>Treatment</th>
+                                <th>Medication</th>
                                 <th>Notes</th>
                             </tr>
                         </thead>
@@ -178,7 +187,14 @@ $patients = $patients_stmt->fetchAll();
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Medication</label>
-                        <textarea name="treatment" class="form-control" required></textarea>
+                        <select name="treatment" class="form-select" required>
+                            <option disabled selected>-- Select Medication --</option>
+                            <?php foreach ($meds as $med): ?>
+                                <option value="<?= $med['item_name'] ?>|<?= $med['id'] ?>">
+                                    <?= htmlspecialchars($med['item_name']) ?> (<?= $med['quantity'] ?> <?= $med['unit'] ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Notes</label>
