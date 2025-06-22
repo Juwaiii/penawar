@@ -7,6 +7,22 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'patient') {
     exit();
 }
 
+// If admin, get patient ID from query string
+if ($_SESSION['role'] === 'admin') {
+    if (!isset($_GET['id'])) {
+        echo "Patient ID is required.";
+        exit();
+    }
+    $patientId = $_GET['id'];
+    $stmt = $pdo->prepare("SELECT p.* FROM profile p JOIN users u ON p.user_id = u.id WHERE u.id = ?");
+    $stmt->execute([$patientId]);
+} else {
+    // If patient, fetch own profile
+    $stmt = $pdo->prepare("SELECT p.* FROM profile p JOIN users u ON p.user_id = u.id WHERE u.id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+}
+$patient = $stmt->fetch();
+
 // Get patient info
 $stmt = $pdo->prepare("SELECT p.* FROM profile p JOIN users u ON p.user_id = u.id WHERE u.id = ?");
 $stmt->execute([$_SESSION['user_id']]);

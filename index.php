@@ -73,6 +73,19 @@ if (isset($_SESSION['username'])) {
         .role-option input {
             display: none;
         }
+        .password-wrapper {
+            position: relative;
+        }
+        .toggle-password {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #555;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -136,14 +149,25 @@ if (isset($_SESSION['username'])) {
                     </div>
                 </div>
             </div>
+
             <div class="mb-3">
                 <label for="username" class="form-label">Username</label>
                 <input type="text" class="form-control" id="username" name="username" required>
             </div>
+
             <div class="mb-3">
                 <label for="password" class="form-label">Password</label>
-                <input type="password" class="form-control" id="password" name="password" required>
+                <div class="password-wrapper">
+                    <input type="password" class="form-control" id="password" name="password" required>
+                    <button type="button" class="toggle-password" onclick="togglePassword()">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <div class="text-end mt-1">
+                    <a href="forgot-password.php" class="text-decoration-none">Forgot password?</a>
+                </div>
             </div>
+
             <button type="submit" class="btn btn-primary w-100">Login</button>
         </form>
 
@@ -152,6 +176,7 @@ if (isset($_SESSION['username'])) {
         </div>
     </div>
 </div>
+
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const options = document.querySelectorAll('.role-option');
@@ -165,6 +190,20 @@ if (isset($_SESSION['username'])) {
             });
         });
     });
+
+    function togglePassword() {
+        const passwordField = document.getElementById("password");
+        const icon = document.querySelector(".toggle-password i");
+        if (passwordField.type === "password") {
+            passwordField.type = "text";
+            icon.classList.remove("fa-eye");
+            icon.classList.add("fa-eye-slash");
+        } else {
+            passwordField.type = "password";
+            icon.classList.remove("fa-eye-slash");
+            icon.classList.add("fa-eye");
+        }
+    }
 </script>
 </body>
 </html>
